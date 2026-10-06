@@ -1,0 +1,62 @@
+plugins { id 'com.android.application' }
+def config = new Properties()
+rootProject.file('monetization.properties').withInputStream { config.load(it) }
+def productionAds = config.getProperty('ADS_MODE', 'test') == 'production'
+def signingReady = System.getenv('SIGNING_STORE_FILE') != null
+android {
+    namespace 'cl.negociospyme.trafficmania'
+    compileSdk 36
+    defaultConfig {
+        applicationId 'cl.negociospyme.trafficmania'
+        minSdk 24
+        targetSdk 36
+        versionCode 1
+        versionName '1.0.0'
+        def ads = productionAds ? config.getProperty('ADMOB_APP_ID') : 'ca-app-pub-3940256099942544~3347511713'
+        manifestPlaceholders = [admobAppId: ads]
+        buildConfigField 'boolean', 'PRODUCTION_ADS', productionAds.toString()
+        buildConfigField 'String', 'BANNER_ID', '"' + (productionAds ? config.getProperty('BANNER_ID') : 'ca-app-pub-3940256099942544/6300978111') + '"'
+        buildConfigField 'String', 'INTERSTITIAL_ID', '"' + (productionAds ? config.getProperty('INTERSTITIAL_ID') : 'ca-app-pub-3940256099942544/1033173712') + '"'
+        buildConfigField 'String', 'REWARDED_ID', '"' + (productionAds ? config.getProperty('REWARDED_ID') : 'ca-app-pub-3940256099942544/5224354917') + '"'
+    }
+    signingConfigs {
+        if (signingReady) {
+            release {
+                storeFile file(System.getenv('SIGNING_STORE_FILE'))
+                storePassword System.getenv('SIGNING_STORE_PASSWORD')
+                keyAlias System.getenv('SIGNING_KEY_ALIAS')
+                keyPassword System.getenv('SIGNING_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        debug {
+            applicationIdSuffix '.debug'
+            versionNameSuffix '-test'
+            manifestPlaceholders = [admobAppId: 'ca-app-pub-3940256099942544~3347511713']
+            buildConfigField 'boolean', 'PRODUCTION_ADS', 'false'
+            buildConfigField 'String', 'BANNER_ID', '\"ca-app-pub-3940256099942544/6300978111\"'
+            buildConfigField 'String', 'INTERSTITIAL_ID', '\"ca-app-pub-3940256099942544/1033173712\"'
+            buildConfigField 'String', 'REWARDED_ID', '\"ca-app-pub-3940256099942544/5224354917\"'
+        }
+        release {
+            minifyEnabled false
+            if (signingReady) signingConfig signingConfigs.release
+        }
+    }
+    buildFeatures { buildConfig true }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+}
+if (productionAds) {
+    ['ADMOB_APP_ID','BANNER_ID','INTERSTITIAL_ID','REWARDED_ID'].each { key ->
+        def value = config.getProperty(key, '')
+        def pattern = key == 'ADMOB_APP_ID' ? /ca-app-pub-\d{16}~\d{10}/ : /ca-app-pub-\d{16}\/\d{10}/
+        if (!(value ==~ pattern) || value.contains('3940256099942544')) throw new GradleException('Completa un ID real válido: ' + key)
+    }
+}
+dependencies {
+    implementation 'androidx.activity:activity:1.10.1'
+    implementation 'androidx.webkit:webkit:1.12.1'
+    implementation 'com.google.android.gms:play-services-ads:25.5.0'
+    implementation 'com.google.android.ump:user-messaging-platform:4.0.0'
+}
